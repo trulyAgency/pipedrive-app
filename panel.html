@@ -3,20 +3,23 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Truly panel</title>
+<title>Truly superpowers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Sora:wght@600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@pipedrive/app-extensions-sdk@0/dist/index.umd.js"></script>
 <style>
-  :root { --text:#1b1f24; --muted:#5b6470; --line:#e3e6ea; --blue:#0a66c2; --green:#1a7f37; --red:#c62828; --bg:#ffffff; --chip:#f2f4f7; }
+  :root { --text:#1b1f24; --muted:#5b6470; --line:#e3e6ea; --orange:#FD5821; --orange-hover:#FF6B38; --on-orange:#131313; --navy:#2E365C; --green:#1a7f37; --red:#c62828; --bg:#ffffff; --chip:#f2f4f7; }
   :root[data-theme="dark"] { --text:#e8eaed; --muted:#a0a7b1; --line:#3a3f45; --bg:transparent; --chip:#2a2e33; }
   html, body { margin:0; padding:0; background:var(--bg); }
-  body { font-family:-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size:13px; line-height:1.45; color:var(--text); padding:10px 16px 12px; }
+  body { font-family:"Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size:13px; line-height:1.45; color:var(--text); padding:10px 16px 12px; }
   #state { background:var(--chip); border-radius:6px; padding:8px 10px; margin-bottom:10px; color:var(--muted); }
   #state.ok { color:var(--green); }
   #state.err { color:var(--red); }
   #state:empty { display:none; }
   #buttons { display:flex; flex-direction:column; gap:8px; }
-  button { appearance:none; border:0; border-radius:6px; padding:8px 12px; font-weight:600; font-size:13px; line-height:1.2; font-family:inherit; color:#fff; background:var(--blue); cursor:pointer; width:100%; text-align:center; }
-  button.confirm { background:var(--green); }
+  button { appearance:none; border:0; border-radius:6px; padding:9px 12px; font-weight:600; font-size:13px; line-height:1.25; font-family:"Sora", "Inter", sans-serif; letter-spacing:.01em; color:var(--on-orange); background:var(--orange); cursor:pointer; width:100%; text-align:center; }
+  button:hover:not(:disabled) { background:var(--orange-hover); }
+  button.confirm { background:var(--navy); color:#fff; }
   button:disabled { opacity:.55; cursor:default; }
   #msg { margin-top:10px; color:var(--muted); }
   #msg.ok { color:var(--green); }
