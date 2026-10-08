@@ -3,25 +3,34 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Truly panel</title>
+<title>Truly superpowers</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Sora:wght@600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@pipedrive/app-extensions-sdk@0/dist/index.umd.js"></script>
 <style>
-  :root { --text:#1b1f24; --muted:#5b6470; --line:#e3e6ea; --blue:#0a66c2; --green:#1a7f37; --red:#c62828; --bg:#ffffff; }
-  @media (prefers-color-scheme: dark) { :root { --text:#e8eaed; --muted:#a0a7b1; --line:#3a3f45; --bg:transparent; } }
+  :root { --text:#1b1f24; --muted:#5b6470; --line:#e3e6ea; --orange:#FD5821; --orange-hover:#FF6B38; --on-orange:#131313; --navy:#2E365C; --green:#1a7f37; --red:#c62828; --bg:#ffffff; --chip:#f2f4f7; }
+  :root[data-theme="dark"] { --text:#e8eaed; --muted:#a0a7b1; --line:#3a3f45; --bg:transparent; --chip:#2a2e33; }
   html, body { margin:0; padding:0; background:var(--bg); }
-  body { font-family:-apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size:13px; line-height:1.45; color:var(--text); padding:10px 16px 12px; }
+  body { font-family:"Inter", -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; font-size:13px; line-height:1.45; color:var(--text); padding:10px 16px 12px; }
+  #state { background:var(--chip); border-radius:6px; padding:8px 10px; margin-bottom:10px; color:var(--muted); }
+  #state.ok { color:var(--green); }
+  #state.err { color:var(--red); }
+  #state:empty { display:none; }
   #buttons { display:flex; flex-direction:column; gap:8px; }
-  button { appearance:none; border:0; border-radius:6px; padding:8px 12px; font:600 13px/1.2 inherit; font-family:inherit; color:#fff; background:var(--blue); cursor:pointer; width:100%; text-align:center; }
-  button.confirm { background:var(--green); }
+  button { appearance:none; border:0; border-radius:6px; padding:9px 12px; font-weight:600; font-size:13px; line-height:1.25; font-family:"Sora", "Inter", sans-serif; letter-spacing:.01em; color:var(--on-orange); background:var(--orange); cursor:pointer; width:100%; text-align:center; }
+  button:hover:not(:disabled) { background:var(--orange-hover); }
+  button.confirm { background:var(--navy); color:#fff; }
   button:disabled { opacity:.55; cursor:default; }
-  #status { margin-top:10px; color:var(--muted); }
-  #status.ok { color:var(--green); }
-  #status.err { color:var(--red); }
+  #msg { margin-top:10px; color:var(--muted); }
+  #msg.ok { color:var(--green); }
+  #msg.err { color:var(--red); }
+  #msg:empty { display:none; }
 </style>
 </head>
 <body>
+<div id="state">Ladataan…</div>
 <div id="buttons"></div>
-<div id="status">Ladataan…</div>
+<div id="msg"></div>
 
 <script>
 (function () {
@@ -31,9 +40,12 @@
   var ACTION_URL = API + 'truly-pd-panel-action-9c4f2a7e-1b3d-4e8a-b6f0-5d2c7e9a1f48';
 
   var params = new URLSearchParams(location.search);
-  var statusEl = document.getElementById('status');
+  var stateEl = document.getElementById('state');
   var buttonsEl = document.getElementById('buttons');
+  var msgEl = document.getElementById('msg');
   var sdk = null;
+
+  if (params.get('theme') === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
 
   var NS = window.AppExtensionsSDK;
   var SDKClass = NS && (typeof NS === 'function' ? NS : (NS.default || NS.AppExtensionsSDK));
@@ -42,9 +54,9 @@
   var CMD_RESIZE = Cmd.RESIZE || 'resize';
   var CMD_TOKEN = Cmd.GET_SIGNED_TOKEN || 'get_signed_token';
 
-  function setStatus(text, cls) {
-    statusEl.textContent = text;
-    statusEl.className = cls || '';
+  function setText(el, text, cls) {
+    el.textContent = text || '';
+    el.className = cls || '';
     resize();
   }
 
@@ -73,12 +85,13 @@
     };
   }
 
-  function renderButtons(buttons) {
+  function renderButtons(buttons, blocked) {
     buttonsEl.innerHTML = '';
     (buttons || []).forEach(function (b) {
       var btn = document.createElement('button');
       btn.type = 'button';
       btn.textContent = b.label;
+      btn.disabled = !!blocked;
       var armed = false;
       btn.addEventListener('click', function () {
         if (!armed) {
@@ -99,10 +112,9 @@
   }
 
   function runAction(b, btn) {
-    var all = buttonsEl.querySelectorAll('button');
-    all.forEach(function (x) { x.disabled = true; });
+    buttonsEl.querySelectorAll('button').forEach(function (x) { x.disabled = true; });
     btn.textContent = 'Lähetetään…';
-    setStatus('Käsitellään…');
+    setText(msgEl, 'Käsitellään…');
     freshToken().then(function (token) {
       var f = baseFields(token);
       f.button = b.id;
@@ -111,15 +123,12 @@
     }).then(function (r) {
       return r.json().catch(function () { return { ok: false, message: 'Virheellinen vastaus (HTTP ' + r.status + ').' }; });
     }).then(function (j) {
-      setStatus(j.message || 'Ei vastausta.', j.ok ? 'ok' : 'err');
-      if (sdk) sdk.execute(CMD_SNACK, { message: j.message || 'Valmis' }).catch(function () {});
-      if (j.status) { /* n8n voi palauttaa päivitetyn tilan */ }
+      setText(msgEl, j.message || 'Ei vastausta.', j.ok ? 'ok' : 'err');
+      if (sdk) sdk.execute(CMD_SNACK, { message: j.ok ? 'Pyyntö vastaanotettu' : 'Pyyntöä ei lähetetty' }).catch(function () {});
     }).catch(function (e) {
-      setStatus('Yhteysvirhe: ' + e.message, 'err');
+      setText(msgEl, 'Yhteysvirhe: ' + e.message, 'err');
     }).then(function () {
-      all.forEach(function (x) { x.disabled = false; });
-      btn.textContent = b.label;
-      btn.className = '';
+      return loadConfig();
     });
   }
 
@@ -130,21 +139,21 @@
     }).then(function (r) {
       return r.json().catch(function () { return { ok: false, message: 'Virheellinen vastaus (HTTP ' + r.status + ').' }; });
     }).then(function (j) {
-      if (!j.ok) { setStatus(j.message || 'Paneelin lataus epäonnistui.', 'err'); return; }
-      renderButtons(j.buttons);
-      setStatus(j.status || '');
+      if (!j.ok) { setText(stateEl, j.message || 'Paneelin lataus epäonnistui.', 'err'); renderButtons([], true); return; }
+      setText(stateEl, j.status || '', j.tyyppi === 'ok' ? 'ok' : (j.tyyppi === 'err' ? 'err' : ''));
+      renderButtons(j.buttons, j.estetty);
     }).catch(function (e) {
-      setStatus('Yhteysvirhe: ' + e.message, 'err');
+      setText(stateEl, 'Yhteysvirhe: ' + e.message, 'err');
     });
   }
 
   // SDK pitää alustaa 10 sekunnissa, joten se tehdään ennen n8n-kutsuja.
-  if (!SDKClass) { setStatus('Pipedrive SDK ei latautunut.', 'err'); return; }
+  if (!SDKClass) { setText(stateEl, 'Pipedrive SDK ei latautunut.', 'err'); return; }
   new SDKClass().initialize({ size: { height: 120 } }).then(function (s) {
     sdk = s;
     return loadConfig();
   }).catch(function (e) {
-    setStatus('SDK-virhe: ' + (e && e.message ? e.message : e), 'err');
+    setText(stateEl, 'SDK-virhe: ' + (e && e.message ? e.message : e), 'err');
   });
 })();
 </script>
