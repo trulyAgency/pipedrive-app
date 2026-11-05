@@ -24,8 +24,11 @@
   .bstatus:empty { display:none; }
   button { appearance:none; border:0; border-radius:6px; padding:9px 12px; font-weight:600; font-size:13px; line-height:1.25; font-family:"Sora", "Inter", sans-serif; letter-spacing:.01em; color:var(--on-orange); background:var(--orange); cursor:pointer; width:100%; text-align:center; }
   button:hover:not(:disabled) { background:var(--orange-hover); }
-  button.confirm { background:var(--navy); color:#fff; }
+  button.confirm, button.confirm:hover:not(:disabled) { background:var(--navy); color:#fff; }
   button:disabled { opacity:.55; cursor:default; }
+  .gtitle { font-weight:600; font-family:"Sora", "Inter", sans-serif; font-size:12px; letter-spacing:.01em; }
+  .grow { display:flex; gap:8px; }
+  .grow button { flex:1 1 0; min-width:0; padding:7px 10px; font-size:12px; }
   #msg { margin-top:10px; color:var(--muted); }
   #msg.ok { color:var(--green); }
   #msg.err { color:var(--red); }
@@ -92,39 +95,70 @@
     };
   }
 
+  function statusEl(b) {
+    var st = document.createElement('div');
+    st.className = 'bstatus ' + tyyppiLuokka(b.tyyppi);
+    st.textContent = b.status || '';
+    return st;
+  }
+
+  // Kaksivaiheinen nappi: ensimmäinen painallus pyytää vahvistuksen (5 s), toinen lähettää.
+  function makeButton(b, blockedAll, confirmText) {
+    var btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = b.label;
+    btn.disabled = !!blockedAll || !!b.estetty;
+    var armed = false;
+    btn.addEventListener('click', function () {
+      if (!armed) {
+        armed = true;
+        btn.textContent = confirmText;
+        btn.className = 'confirm';
+        setTimeout(function () {
+          if (armed && !btn.disabled) { armed = false; btn.textContent = b.label; btn.className = ''; }
+        }, 5000);
+        return;
+      }
+      armed = false;
+      runAction(b, btn);
+    });
+    return btn;
+  }
+
   // Jokainen nappi näyttää oman tilansa (b.status) ja lukittuu omasta tilastaan (b.estetty).
-  // blockedAll lukitsee kaikki napit (vanha vastausmuoto tai paneeli ei käytössä).
+  // Napit, joilla on sama b.ryhma (esim. kieliversiot FI / EN), näytetään rinnakkain yhden otsikon alla,
+  // ja ryhmän tilariviksi valitaan tuorein tila (b.paivitetty). blockedAll lukitsee kaikki napit.
   function renderButtons(buttons, blockedAll) {
     buttonsEl.innerHTML = '';
+    var ryhmat = {};
     (buttons || []).forEach(function (b) {
+      if (b.ryhma) {
+        var g = ryhmat[b.ryhma];
+        if (!g) {
+          g = ryhmat[b.ryhma] = { item: document.createElement('div'), row: document.createElement('div'), napit: [] };
+          g.item.className = 'item';
+          var title = document.createElement('div');
+          title.className = 'gtitle';
+          title.textContent = b.ryhma;
+          g.item.appendChild(title);
+          g.row.className = 'grow';
+          g.item.appendChild(g.row);
+          buttonsEl.appendChild(g.item);
+        }
+        g.napit.push(b);
+        g.row.appendChild(makeButton(b, blockedAll, 'Vahvista ' + b.label));
+        return;
+      }
       var item = document.createElement('div');
       item.className = 'item';
-      if (b.status !== undefined) {
-        var st = document.createElement('div');
-        st.className = 'bstatus ' + tyyppiLuokka(b.tyyppi);
-        st.textContent = b.status || '';
-        item.appendChild(st);
-      }
-      var btn = document.createElement('button');
-      btn.type = 'button';
-      btn.textContent = b.label;
-      btn.disabled = !!blockedAll || !!b.estetty;
-      var armed = false;
-      btn.addEventListener('click', function () {
-        if (!armed) {
-          armed = true;
-          btn.textContent = 'Vahvista: ' + b.label;
-          btn.className = 'confirm';
-          setTimeout(function () {
-            if (armed && !btn.disabled) { armed = false; btn.textContent = b.label; btn.className = ''; }
-          }, 5000);
-          return;
-        }
-        armed = false;
-        runAction(b, btn);
-      });
-      item.appendChild(btn);
+      if (b.status !== undefined) item.appendChild(statusEl(b));
+      item.appendChild(makeButton(b, blockedAll, 'Vahvista: ' + b.label));
       buttonsEl.appendChild(item);
+    });
+    Object.keys(ryhmat).forEach(function (k) {
+      var g = ryhmat[k];
+      var latest = g.napit.slice().sort(function (a, c) { return (Number(c.paivitetty) || 0) - (Number(a.paivitetty) || 0); })[0];
+      if (latest && latest.status !== undefined) g.item.insertBefore(statusEl(latest), g.row);
     });
     resize();
   }
@@ -136,6 +170,9 @@
     freshToken().then(function (token) {
       var f = baseFields(token);
       f.button = b.id;
+      // Valinnaiset: toiminto ja kieli. n8n tarkistaa ne sallittujen listalta ja napin asetuksia vasten.
+      if (b.action) f.action = b.action;
+      if (b.lang) f.lang = b.lang;
       // Lomakemuotoinen POST on "simple request", joten selain ei tee CORS-esikyselyä.
       return fetch(ACTION_URL, { method: 'POST', body: new URLSearchParams(f) });
     }).then(function (r) {
